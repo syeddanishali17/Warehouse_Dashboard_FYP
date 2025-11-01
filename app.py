@@ -408,14 +408,16 @@ with tab1:
         )
     
 with tab2:
-    st.header("🚚 Simulation: 1 Inefficient Worker vs. 4 Optimized Workers")
+    st.header("🚚 Route Optimization Simulation")
     st.markdown("""
-    This simulation visually explains the core of the VRP thesis. It pits one 'Current Practice' worker (red) against a fleet of four 'Optimized' workers (green, blue, orange, purple).
+    This simulation demonstrates the Vehicle Routing Problem (VRP) optimization by comparing a single-worker approach 
+    against a multi-worker zone-based strategy.
 
-    - **🟥 Red Worker (Current Practice):** Follows a long, inefficient "zig-zag" route, attempting to do the entire job alone.
-    - **🟩🟦🟧🟪 Optimized Fleet (Your Model):** The 30 racks are divided into four zones, and each worker handles one zone in parallel.
+    - **🟥 Current Practice (Red):** One worker follows an inefficient zig-zag route, attempting all 30 stops sequentially.
+    - **🟩🟦🟧🟪 Optimized Approach (Multi-colored):** Four workers operate in parallel, each assigned to a specific zone 
+    (approximately 7-8 stops per worker).
 
-    Watch how the optimized fleet finishes the *same 30-stop job* in a fraction of the time.
+    The simulation shows how parallel zone-based routing significantly reduces total completion time compared to sequential processing.
     """)
     
     # --- Route Definitions ---
