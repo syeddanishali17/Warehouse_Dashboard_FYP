@@ -438,8 +438,18 @@ with tab2:
     OPT_ROUTE_4 = [21, 22, 23, 26, 27, 28, 29, 30] # Zone 4 (Purple)
     
     # --- Coordinate Mapping ---
-    layout_data['node_id'] = layout_data['Location'].apply(lambda x: 0 if x == 'Start' else int(x.split(' ')[1]))
-    node_coords = layout_data.set_index('node_id')[['x', 'y']].to_dict('index')
+    # Create a copy and add node_id column
+    layout_data_copy = layout_data.copy()
+    layout_data_copy['node_id'] = layout_data_copy['Location'].apply(
+        lambda x: 0 if x == 'Start' else (int(x.split(' ')[1]) if 'Rack' in str(x) else -1)
+    )
+    
+    # Filter to only include Start and Racks 1-30 (remove duplicates)
+    layout_data_copy = layout_data_copy[layout_data_copy['node_id'] >= 0]
+    layout_data_copy = layout_data_copy.drop_duplicates(subset='node_id', keep='first')
+    
+    # Create coordinate lookup dictionary
+    node_coords = layout_data_copy.set_index('node_id')[['x', 'y']].to_dict('index')
     start_coords = node_coords[0]
 
     # Function to build a full coordinate path (Start -> Racks -> Start)
@@ -497,6 +507,6 @@ with tab2:
         st.info("💡 **Click the '► Play' button on the chart** (bottom left) to start the simulation.")
         with st.spinner("Generating detailed animation... This may take a moment."):
             # We are now calling a new, more advanced function
-            fig_anim = create_multi_route_animation(layout_data, route_definitions)
+            fig_anim = create_multi_route_animation(layout_data_copy, route_definitions)
             st.plotly_chart(fig_anim, use_container_width=True)
 
