@@ -474,6 +474,7 @@ with tab2:
     
     # --- Create and Display the Chart ---
     if st.button("► Run Route Animation", type="primary"):
+        st.info("💡 **Click the '► Play' button on the chart** (bottom left) to start the animation.")
         with st.spinner("Generating animation..."):
             fig_anim = create_route_animation(layout_data_copy, current_route_coords, optimized_route_coords)
             st.plotly_chart(fig_anim, use_container_width=True)
