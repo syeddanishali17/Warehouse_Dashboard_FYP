@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from data_loader import WarehouseDataLoader
-from ui_components import create_route_animation
+from ui_components import create_multi_route_animation
 
 
 # Page configuration
@@ -408,173 +408,95 @@ with tab1:
         )
     
 with tab2:
-    st.header("🚚 Order Picking Animation: Current vs. Optimized")
-    
+    st.header("🚚 Simulation: 1 Inefficient Worker vs. 4 Optimized Workers")
     st.markdown("""
-    ### 📦 Scenario: Picking 12 Items from a Multi-Aisle Warehouse
-    
-    This animation demonstrates how route optimization reduces travel time and distance in a real warehouse operation.
-    Watch as both workers pick the same 12 items, but following different routes.
-    
-    **Key Observations:**
-    - 🟥 **Left (Current Practice)**: Worker jumps between aisles unnecessarily
-    - 🟩 **Right (Optimized Model)**: Worker follows a systematic pattern, staying within aisles
-    - 📊 **Metrics Update**: Distance and stop count shown in real-time
-    - 🛣️ **Path Visualization**: Route is drawn progressively as the worker moves
+    This simulation visually explains the core of the VRP thesis. It pits one 'Current Practice' worker (red) against a fleet of four 'Optimized' workers (green, blue, orange, purple).
+
+    - **🟥 Red Worker (Current Practice):** Follows a long, inefficient "zig-zag" route, attempting to do the entire job alone.
+    - **🟩🟦🟧🟪 Optimized Fleet (Your Model):** The 30 racks are divided into four zones, and each worker handles one zone in parallel.
+
+    Watch how the optimized fleet finishes the *same 30-stop job* in a fraction of the time.
     """)
     
     # --- Route Definitions ---
-    # Realistic picking scenario: 12 items spread across 3 aisles
-    
-    # Current Practice: Poor route planning - jumping between aisles
-    # Picks items in the order they appear on the pick list (without optimization)
+    # We will define 5 distinct routes to animate.
+
+    # 1. THE INEFFICIENT "CURRENT PRACTICE" ROUTE (1 WORKER, 30 STOPS)
     CURRENT_ROUTE_NODES = [
-        1,   # Aisle 1, Left side
-        21,  # Jump to Aisle 3, Left side (BAD!)
-        3,   # Back to Aisle 1 (BAD!)
-        23,  # Jump to Aisle 3 again (BAD!)
-        5,   # Back to Aisle 1 (BAD!)
-        15,  # Jump to Aisle 2, Right side (BAD!)
-        7,   # Aisle 1, Right side
-        27,  # Jump to Aisle 3, Right side (BAD!)
-        12,  # Jump to Aisle 2, Left side (BAD!)
-        24,  # Jump to Aisle 3 (BAD!)
-        9,   # Back to Aisle 1 (BAD!)
-        19   # Aisle 2, Right side
+        1, 11, 21, 6, 16, 26, # Inefficient zig-zag
+        2, 12, 22, 7, 17, 27,
+        3, 13, 23, 8, 18, 28,
+        4, 14, 24, 9, 19, 29,
+        5, 15, 25, 10, 20, 30
     ]
-    
-    # Optimized Route: Intelligent clustering - complete each aisle before moving to next
-    # Same 12 items, but picked in optimal sequence
-    OPTIMIZED_ROUTE_NODES = [
-        1, 3, 5, 7, 9,      # Complete Aisle 1 (left to right)
-        12, 15, 19,         # Complete Aisle 2 (left to right)
-        21, 23, 24, 27      # Complete Aisle 3 (left to right)
-    ]
+
+    # 2. THE 4 OPTIMIZED ROUTES (4 WORKERS, ~7-8 STOPS EACH)
+    # These routes are logical, S-shaped, and parallel.
+    OPT_ROUTE_1 = [1, 2, 3, 4, 5, 10, 9, 8]  # Zone 1 (Green)
+    OPT_ROUTE_2 = [6, 7, 11, 12, 13, 14, 15] # Zone 2 (Blue)
+    OPT_ROUTE_3 = [16, 17, 18, 19, 20, 25, 24] # Zone 3 (Orange)
+    OPT_ROUTE_4 = [21, 22, 23, 26, 27, 28, 29, 30] # Zone 4 (Purple)
     
     # --- Coordinate Mapping ---
-    # We need to map these node lists to the x,y coordinates from layout_data
-    
-    # Create a 'node_id' column to match our lists
-    layout_data_copy = layout_data.copy()
-    layout_data_copy['node_id'] = layout_data_copy['Location'].apply(
-        lambda x: 0 if x == 'Start' else (int(x.split(' ')[1]) if 'Rack' in x else -1)
-    )
-    
-    # Filter to only include Start and Racks 1-30 (remove duplicates)
-    layout_data_copy = layout_data_copy[layout_data_copy['node_id'] >= 0]
-    layout_data_copy = layout_data_copy.drop_duplicates(subset='node_id', keep='first')
-    
-    # Create a coordinate lookup dictionary
-    node_coords = layout_data_copy.set_index('node_id')[['x', 'y']].to_dict('index')
-    
-    # Get Start/Depot coordinates (Node 0)
+    layout_data['node_id'] = layout_data['Location'].apply(lambda x: 0 if x == 'Start' else int(x.split(' ')[1]))
+    node_coords = layout_data.set_index('node_id')[['x', 'y']].to_dict('index')
     start_coords = node_coords[0]
+
+    # Function to build a full coordinate path (Start -> Racks -> Start)
+    def get_coord_path(nodes):
+        if not nodes:
+            return []
+        return [start_coords] + [node_coords[n] for n in nodes] + [start_coords]
+
+    # Create a list of route dictionaries for the animation function
+    route_definitions = [
+        {
+            "name": "Current Practice",
+            "color": "#e74c3c", # Red
+            "symbol": "cross",
+            "coords": get_coord_path(CURRENT_ROUTE_NODES)
+        },
+        {
+            "name": "Optimized 1",
+            "color": "#2ecc71", # Green
+            "symbol": "circle",
+            "coords": get_coord_path(OPT_ROUTE_1)
+        },
+        {
+            "name": "Optimized 2",
+            "color": "#3498db", # Blue
+            "symbol": "circle",
+            "coords": get_coord_path(OPT_ROUTE_2)
+        },
+        {
+            "name": "Optimized 3",
+            "color": "#f39c12", # Orange
+            "symbol": "circle",
+            "coords": get_coord_path(OPT_ROUTE_3)
+        },
+        {
+            "name": "Optimized 4",
+            "color": "#9b59b6", # Purple
+            "symbol": "circle",
+            "coords": get_coord_path(OPT_ROUTE_4)
+        }
+    ]
     
-    # Build the coordinate lists for the routes
-    current_route_coords = [start_coords] + [node_coords[node] for node in CURRENT_ROUTE_NODES] + [start_coords]
-    optimized_route_coords = [start_coords] + [node_coords[node] for node in OPTIMIZED_ROUTE_NODES] + [start_coords]
+    # --- Display Metrics ---
+    st.subheader("Route Comparison")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Current Practice (Red) Stops", f"{len(CURRENT_ROUTE_NODES)} stops")
+    with col2:
+        st.metric("Optimized Fleet (Total) Stops", f"{sum(len(r) for r in [OPT_ROUTE_1, OPT_ROUTE_2, OPT_ROUTE_3, OPT_ROUTE_4])} stops")
     
-    # Calculate actual distances for comparison
-    def calc_route_distance(coords):
-        total = 0
-        for i in range(1, len(coords)):
-            dx = coords[i]['x'] - coords[i-1]['x']
-            dy = coords[i]['y'] - coords[i-1]['y']
-            total += (dx**2 + dy**2)**0.5
-        return total
-    
-    # Build coordinate lists
-    current_full_route = [start_coords] + [node_coords[node] for node in CURRENT_ROUTE_NODES] + [start_coords]
-    optimized_full_route = [start_coords] + [node_coords[node] for node in OPTIMIZED_ROUTE_NODES] + [start_coords]
-    
-    current_distance = calc_route_distance(current_full_route)
-    optimized_distance = calc_route_distance(optimized_full_route)
-    distance_saved = current_distance - optimized_distance
-    improvement_pct = (distance_saved / current_distance) * 100
-    
-    # Display comparison metrics
-    st.markdown("### 📊 Route Comparison Metrics")
-    col_anim1, col_anim2, col_anim3 = st.columns(3)
-    
-    with col_anim1:
-        st.metric(
-            "Current Practice Distance", 
-            f"{current_distance:.1f}m",
-            delta=None,
-            help="Total distance traveled including return to depot"
-        )
-        st.caption("❌ Inefficient aisle-jumping")
-    
-    with col_anim2:
-        st.metric(
-            "Optimized Distance", 
-            f"{optimized_distance:.1f}m",
-            delta=f"-{distance_saved:.1f}m",
-            delta_color="normal",
-            help="Total distance traveled including return to depot"
-        )
-        st.caption("✅ Systematic aisle completion")
-    
-    with col_anim3:
-        st.metric(
-            "Improvement", 
-            f"{improvement_pct:.1f}%",
-            delta=f"{distance_saved:.1f}m saved",
-            delta_color="normal",
-            help="Percentage reduction in travel distance"
-        )
-        st.caption(f"🎯 Same {len(CURRENT_ROUTE_NODES)} items picked")
-    
-    # --- Create and Display the Chart ---
     st.markdown("---")
-    if st.button("🎬 Generate Animation", type="primary", use_container_width=True):
-        st.info("💡 **Click '▶ Play Animation' on the chart to start** • Watch both workers simultaneously")
-        
-        with st.spinner("Generating side-by-side animation..."):
-            fig_anim = create_route_animation(layout_data_copy, current_route_coords, optimized_route_coords)
+
+    # --- Create and Display the Chart ---
+    if st.button("► Run Warehouse Simulation", type="primary"):
+        st.info("💡 **Click the '► Play' button on the chart** (bottom left) to start the simulation.")
+        with st.spinner("Generating detailed animation... This may take a moment."):
+            # We are now calling a new, more advanced function
+            fig_anim = create_multi_route_animation(layout_data, route_definitions)
             st.plotly_chart(fig_anim, use_container_width=True)
-            
-            # Detailed insights after animation
-            st.markdown("---")
-            st.markdown("### 🎓 Key Insights for Thesis")
-            
-            col_insight1, col_insight2 = st.columns(2)
-            
-            with col_insight1:
-                st.markdown("""
-                #### ❌ Current Practice Problems:
-                1. **Aisle Jumping**: Worker constantly moves between aisles (e.g., Rack 1 → Rack 21 → Rack 3)
-                2. **Backtracking**: Returns to previously visited aisles multiple times
-                3. **No Clustering**: Items picked in pick-list order without spatial consideration
-                4. **Longer Distance**: Travels {:.1f}m for the same 12 items
-                5. **Higher Labor Cost**: More time = higher operational cost
-                """.format(current_distance))
-            
-            with col_insight2:
-                st.markdown("""
-                #### ✅ Optimized Model Benefits:
-                1. **Aisle Completion**: Finishes each aisle before moving to next
-                2. **Systematic Flow**: Follows a clear left-to-right, aisle-by-aisle pattern
-                3. **Intelligent Clustering**: Groups items by proximity
-                4. **Shorter Distance**: Only {:.1f}m - **{:.1f}% reduction**
-                5. **Lower Labor Cost**: Less time = reduced operational expenses
-                """.format(optimized_distance, improvement_pct))
-            
-            st.success(f"""
-            **💰 Business Impact**: For a warehouse processing {orders_per_day} orders/day × {working_days_per_year} days/year, 
-            this {improvement_pct:.1f}% improvement translates to significant cost savings as shown in the ROI Dashboard tab.
-            """)
-            
-            st.markdown("---")
-            st.markdown("""
-            ### 📝 How to Use This Animation in Your Thesis:
-            
-            1. **Problem Statement**: Show the Current Practice (left) to illustrate inefficiency
-            2. **Proposed Solution**: Show the Optimized Model (right) demonstrating systematic routing
-            3. **Quantitative Results**: Reference the distance reduction ({:.1f}m → {:.1f}m = {:.1f}% improvement)
-            4. **Visual Evidence**: Use screenshots from the animation showing the contrast in routing patterns
-            5. **Scalability**: Explain this improvement applies to every order, compounding savings over time
-            
-            **💡 Tip**: Pause the animation at key moments to highlight specific inefficiencies in your presentation!
-            """.format(current_distance, optimized_distance, improvement_pct))
 
