@@ -436,8 +436,12 @@ with tab2:
     # Create a 'node_id' column to match our lists
     layout_data_copy = layout_data.copy()
     layout_data_copy['node_id'] = layout_data_copy['Location'].apply(
-        lambda x: 0 if x == 'Start' else int(x.split(' ')[1])
+        lambda x: 0 if x == 'Start' else (int(x.split(' ')[1]) if 'Rack' in x else -1)
     )
+    
+    # Filter to only include Start and Racks 1-30 (remove duplicates)
+    layout_data_copy = layout_data_copy[layout_data_copy['node_id'] >= 0]
+    layout_data_copy = layout_data_copy.drop_duplicates(subset='node_id', keep='first')
     
     # Create a coordinate lookup dictionary
     node_coords = layout_data_copy.set_index('node_id')[['x', 'y']].to_dict('index')
