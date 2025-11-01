@@ -408,26 +408,47 @@ with tab1:
         )
     
 with tab2:
-    st.header("🚚 Route Animation: Optimized vs. Current Practice")
-    st.markdown("""
-    This animation visualizes the inefficiency of the 'Current' (red) route compared to the 'Optimized' (green) route. 
+    st.header("🚚 Order Picking Animation: Current vs. Optimized")
     
-    The 'Optimized' model groups stops logically, minimizing travel, while the 'Current' route zig-zags across the warehouse, wasting time and distance.
+    st.markdown("""
+    ### 📦 Scenario: Picking 12 Items from a Multi-Aisle Warehouse
+    
+    This animation demonstrates how route optimization reduces travel time and distance in a real warehouse operation.
+    Watch as both workers pick the same 12 items, but following different routes.
+    
+    **Key Observations:**
+    - 🟥 **Left (Current Practice)**: Worker jumps between aisles unnecessarily
+    - 🟩 **Right (Optimized Model)**: Worker follows a systematic pattern, staying within aisles
+    - 📊 **Metrics Update**: Distance and stop count shown in real-time
+    - 🛣️ **Path Visualization**: Route is drawn progressively as the worker moves
     """)
     
     # --- Route Definitions ---
-    # We will use these two hardcoded routes for the animation.
+    # Realistic picking scenario: 12 items spread across 3 aisles
     
-    # A "Spaghetti" route that is intentionally inefficient (zig-zagging)
+    # Current Practice: Poor route planning - jumping between aisles
+    # Picks items in the order they appear on the pick list (without optimization)
     CURRENT_ROUTE_NODES = [
-        1, 21, 6, 26, 2, 22, 7, 27, 3, 23, 8, 28, 4, 24, 9, 29, 5, 25, 10, 30,
-        11, 16, 12, 17, 13, 18, 14, 19, 15, 20
+        1,   # Aisle 1, Left side
+        21,  # Jump to Aisle 3, Left side (BAD!)
+        3,   # Back to Aisle 1 (BAD!)
+        23,  # Jump to Aisle 3 again (BAD!)
+        5,   # Back to Aisle 1 (BAD!)
+        15,  # Jump to Aisle 2, Right side (BAD!)
+        7,   # Aisle 1, Right side
+        27,  # Jump to Aisle 3, Right side (BAD!)
+        12,  # Jump to Aisle 2, Left side (BAD!)
+        24,  # Jump to Aisle 3 (BAD!)
+        9,   # Back to Aisle 1 (BAD!)
+        19   # Aisle 2, Right side
     ]
     
-    # A more logical S-shaped "Optimized" route
+    # Optimized Route: Intelligent clustering - complete each aisle before moving to next
+    # Same 12 items, but picked in optimal sequence
     OPTIMIZED_ROUTE_NODES = [
-        1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 21, 22, 23, 24, 25, 
-        26, 27, 28, 29, 30, 10, 9, 8, 7, 6, 20, 19, 18, 17, 16
+        1, 3, 5, 7, 9,      # Complete Aisle 1 (left to right)
+        12, 15, 19,         # Complete Aisle 2 (left to right)
+        21, 23, 24, 27      # Complete Aisle 3 (left to right)
     ]
     
     # --- Coordinate Mapping ---
@@ -453,40 +474,107 @@ with tab2:
     current_route_coords = [start_coords] + [node_coords[node] for node in CURRENT_ROUTE_NODES] + [start_coords]
     optimized_route_coords = [start_coords] + [node_coords[node] for node in OPTIMIZED_ROUTE_NODES] + [start_coords]
     
-    # Display route statistics
-    col_anim1, col_anim2 = st.columns(2)
+    # Calculate actual distances for comparison
+    def calc_route_distance(coords):
+        total = 0
+        for i in range(1, len(coords)):
+            dx = coords[i]['x'] - coords[i-1]['x']
+            dy = coords[i]['y'] - coords[i-1]['y']
+            total += (dx**2 + dy**2)**0.5
+        return total
+    
+    # Build coordinate lists
+    current_full_route = [start_coords] + [node_coords[node] for node in CURRENT_ROUTE_NODES] + [start_coords]
+    optimized_full_route = [start_coords] + [node_coords[node] for node in OPTIMIZED_ROUTE_NODES] + [start_coords]
+    
+    current_distance = calc_route_distance(current_full_route)
+    optimized_distance = calc_route_distance(optimized_full_route)
+    distance_saved = current_distance - optimized_distance
+    improvement_pct = (distance_saved / current_distance) * 100
+    
+    # Display comparison metrics
+    st.markdown("### 📊 Route Comparison Metrics")
+    col_anim1, col_anim2, col_anim3 = st.columns(3)
     
     with col_anim1:
         st.metric(
-            "Current Route Stops", 
-            len(CURRENT_ROUTE_NODES),
-            help="Number of rack locations visited"
+            "Current Practice Distance", 
+            f"{current_distance:.1f}m",
+            delta=None,
+            help="Total distance traveled including return to depot"
         )
-        st.info("**Current Practice:** Zig-zag pattern across warehouse")
+        st.caption("❌ Inefficient aisle-jumping")
     
     with col_anim2:
         st.metric(
-            "Optimized Route Stops", 
-            len(OPTIMIZED_ROUTE_NODES),
-            help="Number of rack locations visited"
+            "Optimized Distance", 
+            f"{optimized_distance:.1f}m",
+            delta=f"-{distance_saved:.1f}m",
+            delta_color="normal",
+            help="Total distance traveled including return to depot"
         )
-        st.success("**Optimized Model:** Logical S-shaped pattern")
+        st.caption("✅ Systematic aisle completion")
+    
+    with col_anim3:
+        st.metric(
+            "Improvement", 
+            f"{improvement_pct:.1f}%",
+            delta=f"{distance_saved:.1f}m saved",
+            delta_color="normal",
+            help="Percentage reduction in travel distance"
+        )
+        st.caption(f"🎯 Same {len(CURRENT_ROUTE_NODES)} items picked")
     
     # --- Create and Display the Chart ---
-    if st.button("► Run Route Animation", type="primary"):
-        st.info("💡 **Click the '► Play' button on the chart** (bottom left) to start the animation.")
-        with st.spinner("Generating animation..."):
+    st.markdown("---")
+    if st.button("🎬 Generate Animation", type="primary", use_container_width=True):
+        st.info("💡 **Click '▶ Play Animation' on the chart to start** • Watch both workers simultaneously")
+        
+        with st.spinner("Generating side-by-side animation..."):
             fig_anim = create_route_animation(layout_data_copy, current_route_coords, optimized_route_coords)
             st.plotly_chart(fig_anim, use_container_width=True)
             
+            # Detailed insights after animation
+            st.markdown("---")
+            st.markdown("### 🎓 Key Insights for Thesis")
+            
+            col_insight1, col_insight2 = st.columns(2)
+            
+            with col_insight1:
+                st.markdown("""
+                #### ❌ Current Practice Problems:
+                1. **Aisle Jumping**: Worker constantly moves between aisles (e.g., Rack 1 → Rack 21 → Rack 3)
+                2. **Backtracking**: Returns to previously visited aisles multiple times
+                3. **No Clustering**: Items picked in pick-list order without spatial consideration
+                4. **Longer Distance**: Travels {:.1f}m for the same 12 items
+                5. **Higher Labor Cost**: More time = higher operational cost
+                """.format(current_distance))
+            
+            with col_insight2:
+                st.markdown("""
+                #### ✅ Optimized Model Benefits:
+                1. **Aisle Completion**: Finishes each aisle before moving to next
+                2. **Systematic Flow**: Follows a clear left-to-right, aisle-by-aisle pattern
+                3. **Intelligent Clustering**: Groups items by proximity
+                4. **Shorter Distance**: Only {:.1f}m - **{:.1f}% reduction**
+                5. **Lower Labor Cost**: Less time = reduced operational expenses
+                """.format(optimized_distance, improvement_pct))
+            
+            st.success(f"""
+            **💰 Business Impact**: For a warehouse processing {orders_per_day} orders/day × {working_days_per_year} days/year, 
+            this {improvement_pct:.1f}% improvement translates to significant cost savings as shown in the ROI Dashboard tab.
+            """)
+            
             st.markdown("---")
             st.markdown("""
-            ### 📊 Animation Insights
+            ### 📝 How to Use This Animation in Your Thesis:
             
-            - **Red Path (Current)**: Notice how the worker zig-zags across the warehouse, covering unnecessary distance
-            - **Green Path (Optimized)**: The worker follows a systematic S-pattern, minimizing backtracking
-            - **Result**: The optimized route reduces travel distance and time, directly improving efficiency
+            1. **Problem Statement**: Show the Current Practice (left) to illustrate inefficiency
+            2. **Proposed Solution**: Show the Optimized Model (right) demonstrating systematic routing
+            3. **Quantitative Results**: Reference the distance reduction ({:.1f}m → {:.1f}m = {:.1f}% improvement)
+            4. **Visual Evidence**: Use screenshots from the animation showing the contrast in routing patterns
+            5. **Scalability**: Explain this improvement applies to every order, compounding savings over time
             
-            *Click "► Play" in the chart controls to see the animation in action!*
-            """)
+            **💡 Tip**: Pause the animation at key moments to highlight specific inefficiencies in your presentation!
+            """.format(current_distance, optimized_distance, improvement_pct))
 
